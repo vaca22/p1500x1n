@@ -61,7 +61,7 @@ static struct sockaddr_in server_addr;                // server地址
 static struct sockaddr_in client_addr;                // client地址
 static unsigned int socklen = sizeof(client_addr);    // 地址长度
 static int connect_socket = 0;                        // 连接socket
-#define TCP_PORT                8888               // 监听客户端端口
+int TCP_PORT         =       8888;               // 监听客户端端口
 bool g_rxtx_need_restart = false;                    // 异常后，重新连接标记
 
 
@@ -76,8 +76,8 @@ static const char *TAG = "ESP32 NAT router";
 
 
 EventGroupHandle_t udp_event_group;
-#define UDP_PORT				8889
-#define UDP_ADRESS				"192.168.6.103"
+int UDP_PORT	=			8889;
+
 struct sockaddr_in udp_client_addr;
 int udp_connect_socket=0;
 static int receive_udp=0;
@@ -357,10 +357,18 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event) {
             ap_connect = true;
             ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
             if(got_ip==0){
+
+
                 got_ip=1;
                 xTaskCreate(&udp_connect, "udp_connect", 4096, NULL, 5, NULL);
                 xTaskCreate(&tcp_connect, "tcp_connect", 4096, NULL, 5, NULL);
 
+
+                char cc[20];
+                sprintf(cc,IPSTR,IP2STR(&event->event_info.got_ip.ip_info.gw));
+                set_str("gw",cc);
+                sprintf(cc,IPSTR,IP2STR(&event->event_info.got_ip.ip_info.netmask));
+                set_str("netmask",cc);
             }
 
             if (esp_netif_get_dns_info(wifiSTA, ESP_NETIF_DNS_MAIN, &dns) == ESP_OK) {
@@ -485,9 +493,12 @@ char *ssid = NULL;
 char *passwd = NULL;
 char *static_ip = NULL;
 char *ble_name = NULL;
-char *gateway_addr = NULL;
+char *tcpport = NULL;
+char *udpport = NULL;
 char *ap_ssid = NULL;
 char *ap_passwd = NULL;
+char *gw=NULL;
+char *netmask=NULL;
 
 char *param_set_default(const char *def_val) {
     char *retval = malloc(strlen(def_val) + 1);
@@ -499,18 +510,9 @@ char *param_set_default(const char *def_val) {
 
 
 
-
-
-
-
-
-
 void ble_uart(uart_port_t uart_num, const void *src, size_t size){
     uart_write_bytes(uart_num, src, size);
 }
-
-
-
 
 
 
@@ -535,9 +537,17 @@ void app_main(void) {
     if (ble_name == NULL) {
         ble_name = param_set_default("ble_uart");
     }
-    get_config_param_str("gateway_addr", &gateway_addr);
-    if (gateway_addr == NULL) {
-        gateway_addr = param_set_default("");
+    get_config_param_str("tcp_port", &tcpport);
+    if (tcpport == NULL) {
+        tcpport = param_set_default("8888");
+    }else{
+        TCP_PORT=atoi(tcpport);
+    }
+    get_config_param_str("udp_port", &udpport);
+    if (udpport == NULL) {
+        udpport = param_set_default("8889");
+    }else{
+        UDP_PORT=atoi(udpport);
     }
     get_config_param_str("ap_ssid", &ap_ssid);
     if (ap_ssid == NULL) {
@@ -547,8 +557,16 @@ void app_main(void) {
     if (ap_passwd == NULL) {
         ap_passwd = param_set_default("");
     }
+    get_config_param_str("gw", &gw);
+    if (gw == NULL) {
+        gw = param_set_default("");
+    }
+    get_config_param_str("netmask", &netmask);
+    if (netmask == NULL) {
+        netmask = param_set_default("");
+    }
     // Setup WIFI
-    wifi_init(ssid, passwd, static_ip, ble_name, gateway_addr, ap_ssid, ap_passwd);
+    wifi_init(ssid, passwd, static_ip, netmask, gw, ap_ssid, ap_passwd);
 
 
     char *lock = NULL;

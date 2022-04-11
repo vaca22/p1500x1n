@@ -125,15 +125,15 @@ static httpd_uri_t indexp = {
         .handler   = index_get_handler,
 };
 
-
-
+extern int TCP_PORT;
+extern int UDP_PORT;
 httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     char ble_name[] = "dada";
     char checked[] = "checked";
-    int tcp_port= 83;
-    int udp_port = 82;
+    int tcp_port= TCP_PORT;
+    int udp_port = UDP_PORT;
     char bau[] = "115200";
 
     const char *config_page_template = CONFIG_PAGE;
