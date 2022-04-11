@@ -75,6 +75,114 @@ esp_netif_t *wifiSTA;
 static const char *TAG = "ESP32 NAT router";
 
 
+EventGroupHandle_t udp_event_group;
+#define UDP_PORT				8889
+#define UDP_ADRESS				"192.168.6.103"
+struct sockaddr_in udp_client_addr;
+int udp_connect_socket=0;
+
+
+// 关闭socket
+void udp_close_socket()
+{
+    close(udp_connect_socket);
+}
+// 接收数据任务
+void udp_recv_data(void *pvParameters)
+{
+    int len = 0;            //长度
+    char databuff[1024];    //缓存
+    while (1){
+        memset(databuff, 0x00, sizeof(databuff));//清空缓存
+        //读取接收数据
+        len = recvfrom(udp_connect_socket, databuff, sizeof(databuff), 0, (struct sockaddr *) &udp_client_addr, &socklen);
+        if (len > 0){
+            //打印接收到的数组
+            ESP_LOGI(TAG, "UDP Client recvData: %s", databuff);
+            //接收数据回发
+            sendto(udp_connect_socket, databuff, strlen(databuff), 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
+        }else{
+            break;
+        }
+    }
+    udp_close_socket();
+    vTaskDelete(NULL);
+}
+
+esp_err_t create_udp_client()
+{
+    udp_connect_socket = socket(AF_INET, SOCK_DGRAM, 0);                         /*参数和TCP不同*/
+    if (udp_connect_socket < 0){
+
+        close(udp_connect_socket);
+        return ESP_FAIL;
+    }
+
+    udp_client_addr.sin_family = AF_INET;
+    udp_client_addr.sin_port = htons(UDP_PORT);
+    udp_client_addr.sin_addr.s_addr = inet_addr(UDP_ADRESS);
+
+    struct sockaddr_in Loacl_addr;
+    Loacl_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    Loacl_addr.sin_family = AF_INET;
+    Loacl_addr.sin_port = htons(UDP_PORT);
+    uint8_t res = 0;
+    res = bind(udp_connect_socket, (struct sockaddr *)&Loacl_addr, sizeof(Loacl_addr));
+    if(res != 0){
+        printf("bind error\n");
+
+    }
+
+    int len = 0;            //长度
+    char databuff[124] = "Hello Server,Please ack!!";    //缓存
+
+    len = sendto(udp_connect_socket, databuff, 24, 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
+    if (len > 0) {
+        ESP_LOGI(TAG, "Transfer data to %s:%u,ssucceed\n", inet_ntoa(udp_client_addr.sin_addr), ntohs(udp_client_addr.sin_port));
+    } else {
+        close(udp_connect_socket);
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+
+static void udp_connect(void *pvParameters)
+{
+
+    ESP_LOGI(TAG, "start udp connected");
+    vTaskDelay(3000 / portTICK_RATE_MS);
+    ESP_LOGI(TAG, "create udp Client");
+    int socket_ret = create_udp_client();
+    if (socket_ret == ESP_FAIL){
+        ESP_LOGI(TAG, "create udp socket error,stop...");
+        vTaskDelete(NULL);
+    }else{
+        ESP_LOGI(TAG, "create udp socket succeed...");
+        //建立UDP接收数据任务
+        if (pdPASS != xTaskCreate(&udp_recv_data, "recv_data", 4096, NULL, 4, NULL)){
+            ESP_LOGI(TAG, "Recv task create fail!");
+            vTaskDelete(NULL);
+        }else{
+            ESP_LOGI(TAG, "Recv task create succeed!");
+        }
+    }
+    vTaskDelete(NULL);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -134,8 +242,6 @@ void tcp_recv_data(void *pvParameters)
         if (len > 0){
             ESP_LOGI(TAG, "recvData: %s", databuff);//打印接收到的数组
             uart_write_bytes(UART_NUM_1, databuff, len);
-//            send(connect_socket, databuff, strlen(databuff), 0);//接收数据回发
-            //sendto(connect_socket, databuff , sizeof(databuff), 0, (struct sockaddr *) &remote_addr,sizeof(remote_addr));
         }else{
             //  show_socket_error_reason("recv_data", connect_socket);//打印错误信息
             g_rxtx_need_restart = true;//服务器故障，标记重连
@@ -271,6 +377,7 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event) {
             ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
             if(got_ip==0){
                 got_ip=1;
+                xTaskCreate(&udp_connect, "udp_connect", 4096, NULL, 5, NULL);
                 xTaskCreate(&tcp_connect, "tcp_connect", 4096, NULL, 5, NULL);
 
             }
