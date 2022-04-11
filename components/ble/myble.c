@@ -16,7 +16,7 @@ send_uart_callback *uart_send=NULL;
 struct os_mbuf *om;
 uint16_t hrs_hrm_handle;
 uint16_t conn_handle;
-int connect_flag=0;
+int ble_connect_flag=0;
 char ble_name[20];
 
 void register_uart(send_uart_callback * x,char* y) {
@@ -263,7 +263,7 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg) {
 
     switch (event->type) {
         case BLE_GAP_EVENT_CONNECT:
-            connect_flag=1;
+            ble_connect_flag=1;
             conn_handle = event->connect.conn_handle;
             /* A new connection was established or a connection attempt failed. */
             MODLOG_DFLT(INFO, "connection %s; status=%d ",
@@ -281,7 +281,7 @@ bleprph_gap_event(struct ble_gap_event *event, void *arg) {
             return 0;
 
         case BLE_GAP_EVENT_DISCONNECT:
-            connect_flag=0;
+            ble_connect_flag=0;
             MODLOG_DFLT(INFO, "disconnect; reason=%d ", event->disconnect.reason);
 
             MODLOG_DFLT(INFO, "\n");

@@ -116,14 +116,14 @@ esp_err_t create_tcp_server(bool isCreatServer) {
 
 
 
-void close_socket()
+void tcp_close_socket()
 {
     close(connect_socket);
     close(server_socket);
 }
 
 // 接收数据任务
-void recv_data(void *pvParameters)
+void tcp_recv_data(void *pvParameters)
 {
     int len = 0;
     char databuff[1024];
@@ -142,7 +142,7 @@ void recv_data(void *pvParameters)
             vTaskDelete(NULL);
         }
     }
-    close_socket();
+    tcp_close_socket();
     g_rxtx_need_restart = true;//标记重连
     vTaskDelete(NULL);
 }
@@ -161,7 +161,7 @@ static void tcp_connect(void *pvParameters) {
         } else {// 建立成功
             ESP_LOGI(TAG, "create tcp socket succeed...");
             // 建立tcp接收数据任务
-            if (pdPASS != xTaskCreate(&recv_data, "recv_data", 4096, NULL, 4, &tx_rx_task)) {
+            if (pdPASS != xTaskCreate(&tcp_recv_data, "recv_data", 4096, NULL, 4, &tx_rx_task)) {
                 ESP_LOGI(TAG, "Recv task create fail!");
             } else {
                 ESP_LOGI(TAG, "Recv task create succeed!");
@@ -173,7 +173,7 @@ static void tcp_connect(void *pvParameters) {
                 ESP_LOGI(TAG, "tcp server error,some client leave,restart...");
                 // 建立server
                 if (ESP_FAIL != create_tcp_server(false)) {
-                    if (pdPASS != xTaskCreate(&recv_data, "recv_data", 4096, NULL, 4, &tx_rx_task)) {
+                    if (pdPASS != xTaskCreate(&tcp_recv_data, "recv_data", 4096, NULL, 4, &tx_rx_task)) {
                         ESP_LOGE(TAG, "tcp server Recv task create fail!");
                     } else {
                         ESP_LOGI(TAG, "tcp server Recv task create succeed!");
@@ -216,8 +216,8 @@ void init_uart(void) {
 extern struct os_mbuf *om;
 extern uint16_t hrs_hrm_handle;
 extern uint16_t conn_handle;
-extern int connect_flag;
-static void rx_task(void *arg)
+extern int ble_connect_flag;
+static void uart_rx_task(void *arg)
 {
     static const char *RX_TASK_TAG = "RX_TASK";
     esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
@@ -226,7 +226,7 @@ static void rx_task(void *arg)
         const int rxBytes = uart_read_bytes(UART_NUM_1, data, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
         if (rxBytes > 0) {
             data[rxBytes] = 0;
-            if(connect_flag){
+            if(ble_connect_flag){
                 om = ble_hs_mbuf_from_flat(data, rxBytes);
                 ble_gattc_notify_custom(conn_handle, hrs_hrm_handle, om);
             }
@@ -476,7 +476,7 @@ void app_main(void) {
 
 
     init_uart();
-    xTaskCreate(rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
+    xTaskCreate(uart_rx_task, "uart_rx_task", 1024 * 2, NULL, configMAX_PRIORITIES, NULL);
 
     send_uart_callback *ble_uart_callback;
     ble_uart_callback=(send_uart_callback *) malloc(sizeof(send_uart_callback));
