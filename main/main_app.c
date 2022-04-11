@@ -80,7 +80,7 @@ EventGroupHandle_t udp_event_group;
 #define UDP_ADRESS				"192.168.6.103"
 struct sockaddr_in udp_client_addr;
 int udp_connect_socket=0;
-
+static int receive_udp=0;
 
 
 void udp_close_socket()
@@ -97,10 +97,9 @@ void udp_recv_data(void *pvParameters)
         //读取接收数据
         len = recvfrom(udp_connect_socket, databuff, sizeof(databuff), 0, (struct sockaddr *) &udp_client_addr, &socklen);
         if (len > 0){
-            //打印接收到的数组
-            ESP_LOGI(TAG, "UDP Client recvData: %s", databuff);
-            //接收数据回发
-            sendto(udp_connect_socket, databuff, strlen(databuff), 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
+            receive_udp=1;
+            uart_write_bytes(UART_NUM_1, databuff, len);
+
         }else{
             break;
         }
@@ -131,16 +130,7 @@ esp_err_t create_udp_client()
 
     }
 
-//    int len = 0;            //长度
-//    char databuff[124] = "Hello Server,Please ack!!";    //缓存
-//
-//    len = sendto(udp_connect_socket, databuff, 24, 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
-//    if (len > 0) {
-//        ESP_LOGI(TAG, "Transfer data to %s:%u,ssucceed\n", inet_ntoa(udp_client_addr.sin_addr), ntohs(udp_client_addr.sin_port));
-//    } else {
-//        close(udp_connect_socket);
-//        return ESP_FAIL;
-//    }
+
 
     return ESP_OK;
 }
@@ -325,6 +315,9 @@ static void uart_rx_task(void *arg)
                 ble_gattc_notify_custom(conn_handle, hrs_hrm_handle, om);
             }
 
+            if(receive_udp){
+                sendto(udp_connect_socket, data, rxBytes, 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
+            }
             send(connect_socket, data, rxBytes, 0);//接收数据回发
             // ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
             // ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
