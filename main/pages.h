@@ -6,7 +6,7 @@
 <head>\
 <meta charset='utf-8'>\
 <meta content='width=device-width,initial-scale=1' name='viewport'>\
-<title>ESP32 OV2460</title>\
+<title>ESP32 Config</title>\
 <style>\
 body {\
 font-family: Arial, Helvetica, sans-serif;\
@@ -54,7 +54,7 @@ text-align: right\
 <script>\
 if (window.location.search.substr(1) !== '') {\
 document.getElementById('content').display = 'none';\
-document.body.innerHTML = '<h1>ESP32串口透传配置</h1>设置成功， 请等待...';\
+document.body.innerHTML = '<h1>ESP32串口透传配置</h1>设置成功， 请等待几秒钟生效';\
 setTimeout('location.href = '/'', 10000);\
 }\
 </script>\

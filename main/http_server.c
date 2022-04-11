@@ -27,7 +27,20 @@
 static const char *TAG = "HTTPServer";
 
 
+esp_timer_handle_t restart_timer;
 
+static void restart_timer_callback(void* arg)
+{
+    ESP_LOGI(TAG, "Restarting now...");
+    esp_restart();
+}
+
+esp_timer_create_args_t restart_timer_args = {
+        .callback = &restart_timer_callback,
+        /* argument specified here will be passed to timer callback function */
+        .arg = (void*) 0,
+        .name = "restart_timer"
+};
 /* An HTTP GET handler */
 static esp_err_t index_get_handler(httpd_req_t *req) {
     char *buf;
@@ -98,14 +111,18 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
             if (httpd_query_key_value(buf, "udp_port", param1, sizeof(param1)) == ESP_OK) {
                 preprocess_string(param1);
                 ESP_LOGI(TAG, "Found URL query parameter => udp_port=%s  %d", param1, strlen(param1));
-                set_str("udp_port",param1);
+                set_str("udp_port", param1);
             }
             if (httpd_query_key_value(buf, "bau", param1, sizeof(param1)) == ESP_OK) {
                 preprocess_string(param1);
-                ESP_LOGI(TAG, "Found URL query parameter => bau=%s  %d", param1, strlen(param1));
-                set_str("bau",param1);
+                if(atoi(param1)!=0){
+                    ESP_LOGI(TAG, "Found URL query parameter => bau=%s  %d", param1, strlen(param1));
+                    set_str("bau",param1);
+                }
+
             }
 
+            esp_timer_start_once(restart_timer, 500000);
 
         }
         free(buf);
@@ -125,23 +142,24 @@ static httpd_uri_t indexp = {
         .handler   = index_get_handler,
 };
 
-extern int TCP_PORT;
-extern int UDP_PORT;
+
+
 httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    char ble_name[] = "dada";
     char checked[] = "checked";
     int tcp_port= TCP_PORT;
     int udp_port = UDP_PORT;
-    char bau[] = "115200";
+    char bau[10];
+
+    sprintf(bau,"%d",bau_num);
 
     const char *config_page_template = CONFIG_PAGE;
     char *config_page = malloc(strlen(config_page_template) + 512);
     sprintf(config_page, config_page_template, ap_ssid, ap_passwd, ble_name, checked, ssid, passwd,
             static_ip, tcp_port, udp_port, bau);
     indexp.user_ctx = config_page;
-
+    esp_timer_create(&restart_timer_args, &restart_timer);
 
     // Start the httpd server
     ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);

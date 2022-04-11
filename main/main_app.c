@@ -27,7 +27,7 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "cmd_router.h"
-
+#include "config.h"
 
 #include "router_globals.h"
 #include <esp_http_server.h>
@@ -98,7 +98,7 @@ void udp_recv_data(void *pvParameters)
         len = recvfrom(udp_connect_socket, databuff, sizeof(databuff), 0, (struct sockaddr *) &udp_client_addr, &socklen);
         if (len > 0){
             receive_udp=1;
-            uart_write_bytes(UART_NUM_1, databuff, len);
+            uart_write_bytes(UART_PORT_NUM, databuff, len);
 
         }else{
             break;
@@ -219,7 +219,7 @@ void tcp_recv_data(void *pvParameters)
         g_rxtx_need_restart = false;
         if (len > 0){
             ESP_LOGI(TAG, "recvData: %s", databuff);//打印接收到的数组
-            uart_write_bytes(UART_NUM_1, databuff, len);
+            uart_write_bytes(UART_PORT_NUM, databuff, len);
         }else{
             //  show_socket_error_reason("recv_data", connect_socket);//打印错误信息
             g_rxtx_need_restart = true;//服务器故障，标记重连
@@ -272,12 +272,12 @@ static void tcp_connect(void *pvParameters) {
 
 static const int RX_BUF_SIZE = 1024;
 
-#define TXD_PIN (GPIO_NUM_22)
-#define RXD_PIN (GPIO_NUM_21)
+int bau_num=115200;
+
 
 void init_uart(void) {
     const uart_config_t uart_config = {
-            .baud_rate = 115200,
+            .baud_rate = bau_num,
             .data_bits = UART_DATA_8_BITS,
             .parity = UART_PARITY_DISABLE,
             .stop_bits = UART_STOP_BITS_1,
@@ -285,9 +285,9 @@ void init_uart(void) {
             .source_clk = UART_SCLK_APB,
     };
     // We won't use a buffer for sending data.
-    uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_1, &uart_config);
-    uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_driver_install(UART_PORT_NUM, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_PORT_NUM, &uart_config);
+    uart_set_pin(UART_PORT_NUM, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
 
@@ -307,7 +307,7 @@ static void uart_rx_task(void *arg)
     esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
     uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE+1);
     while (1) {
-        const int rxBytes = uart_read_bytes(UART_NUM_1, data, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
+        const int rxBytes = uart_read_bytes(UART_PORT_NUM, data, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
         if (rxBytes > 0) {
             data[rxBytes] = 0;
             if(ble_connect_flag){
@@ -417,6 +417,7 @@ void wifi_init(const char *ssid, const char *passwd, const char *static_ip, cons
 
     tcpip_adapter_ip_info_t ipInfo_sta;
     if ((strlen(ssid) > 0) && (strlen(static_ip) > 0) && (strlen(subnet_mask) > 0) && (strlen(gateway_addr) > 0)) {
+        ESP_LOGE(TAG, "try static ip");
         ipInfo_sta.ip.addr = ipaddr_addr(static_ip);
         ipInfo_sta.gw.addr = ipaddr_addr(gateway_addr);
         ipInfo_sta.netmask.addr = ipaddr_addr(subnet_mask);
@@ -499,6 +500,8 @@ char *ap_ssid = NULL;
 char *ap_passwd = NULL;
 char *gw=NULL;
 char *netmask=NULL;
+char *bauchar=NULL;
+int bau_list[]={9600,19200,38400,115200,2000000};
 
 char *param_set_default(const char *def_val) {
     char *retval = malloc(strlen(def_val) + 1);
@@ -529,7 +532,7 @@ void app_main(void) {
     if (passwd == NULL) {
         passwd = param_set_default("");
     }
-    get_config_param_str("static_ip", &static_ip);
+    get_config_param_str("inner_ip", &static_ip);
     if (static_ip == NULL) {
         static_ip = param_set_default("");
     }
@@ -551,7 +554,7 @@ void app_main(void) {
     }
     get_config_param_str("ap_ssid", &ap_ssid);
     if (ap_ssid == NULL) {
-        ap_ssid = param_set_default("ESP32_NAT_Router");
+        ap_ssid = param_set_default("ESP32_UART");
     }
     get_config_param_str("ap_passwd", &ap_passwd);
     if (ap_passwd == NULL) {
@@ -564,6 +567,15 @@ void app_main(void) {
     get_config_param_str("netmask", &netmask);
     if (netmask == NULL) {
         netmask = param_set_default("");
+    }
+    get_config_param_str("bau", &bauchar);
+    if (bauchar == NULL) {
+        bauchar = param_set_default("4");
+    }else{
+        if(atoi(bauchar)>=1){
+            bau_num=bau_list[atoi(bauchar)-1];
+        }
+
     }
     // Setup WIFI
     wifi_init(ssid, passwd, static_ip, netmask, gw, ap_ssid, ap_passwd);

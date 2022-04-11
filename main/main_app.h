@@ -19,7 +19,10 @@ extern char *ble_name;
 extern char *tcpport;
 extern char *ap_ssid;
 extern char *ap_passwd;
-
+extern int TCP_PORT;
+extern int UDP_PORT;
+extern int bau_num;
+extern char *ble_name;
 void preprocess_string(char *str);
 
 int set_sta(int argc, char **argv);
