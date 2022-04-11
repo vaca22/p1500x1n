@@ -82,12 +82,12 @@ struct sockaddr_in udp_client_addr;
 int udp_connect_socket=0;
 
 
-// 关闭socket
+
 void udp_close_socket()
 {
     close(udp_connect_socket);
 }
-// 接收数据任务
+
 void udp_recv_data(void *pvParameters)
 {
     int len = 0;            //长度
@@ -118,9 +118,7 @@ esp_err_t create_udp_client()
         return ESP_FAIL;
     }
 
-    udp_client_addr.sin_family = AF_INET;
-    udp_client_addr.sin_port = htons(UDP_PORT);
-    udp_client_addr.sin_addr.s_addr = inet_addr(UDP_ADRESS);
+
 
     struct sockaddr_in Loacl_addr;
     Loacl_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -133,16 +131,16 @@ esp_err_t create_udp_client()
 
     }
 
-    int len = 0;            //长度
-    char databuff[124] = "Hello Server,Please ack!!";    //缓存
-
-    len = sendto(udp_connect_socket, databuff, 24, 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
-    if (len > 0) {
-        ESP_LOGI(TAG, "Transfer data to %s:%u,ssucceed\n", inet_ntoa(udp_client_addr.sin_addr), ntohs(udp_client_addr.sin_port));
-    } else {
-        close(udp_connect_socket);
-        return ESP_FAIL;
-    }
+//    int len = 0;            //长度
+//    char databuff[124] = "Hello Server,Please ack!!";    //缓存
+//
+//    len = sendto(udp_connect_socket, databuff, 24, 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
+//    if (len > 0) {
+//        ESP_LOGI(TAG, "Transfer data to %s:%u,ssucceed\n", inet_ntoa(udp_client_addr.sin_addr), ntohs(udp_client_addr.sin_port));
+//    } else {
+//        close(udp_connect_socket);
+//        return ESP_FAIL;
+//    }
 
     return ESP_OK;
 }
@@ -170,16 +168,6 @@ static void udp_connect(void *pvParameters)
     }
     vTaskDelete(NULL);
 }
-
-
-
-
-
-
-
-
-
-
 
 
 
