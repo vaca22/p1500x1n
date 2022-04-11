@@ -41,10 +41,12 @@
 #include "esp_event.h"
 #include "freertos/semphr.h"
 #include <sys/socket.h>
+#include <host/ble_hs_mbuf.h>
+#include <host/ble_gatt.h>
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "main_app.h"
-
+#include "myble.h"
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t wifi_event_group;
 
@@ -211,7 +213,10 @@ void init_uart(void) {
 
 
 
-
+extern struct os_mbuf *om;
+extern uint16_t hrs_hrm_handle;
+extern uint16_t conn_handle;
+extern int connect_flag;
 static void rx_task(void *arg)
 {
     static const char *RX_TASK_TAG = "RX_TASK";
@@ -221,6 +226,11 @@ static void rx_task(void *arg)
         const int rxBytes = uart_read_bytes(UART_NUM_1, data, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
         if (rxBytes > 0) {
             data[rxBytes] = 0;
+            if(connect_flag){
+                om = ble_hs_mbuf_from_flat(data, rxBytes);
+                ble_gattc_notify_custom(conn_handle, hrs_hrm_handle, om);
+            }
+
             send(connect_socket, data, rxBytes, 0);//接收数据回发
             // ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
             // ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
@@ -386,7 +396,7 @@ void wifi_init(const char *ssid, const char *passwd, const char *static_ip, cons
 char *ssid = NULL;
 char *passwd = NULL;
 char *static_ip = NULL;
-char *subnet_mask = NULL;
+char *ble_name = NULL;
 char *gateway_addr = NULL;
 char *ap_ssid = NULL;
 char *ap_passwd = NULL;
@@ -407,7 +417,9 @@ char *param_set_default(const char *def_val) {
 
 
 
-
+void ble_uart(uart_port_t uart_num, const void *src, size_t size){
+    uart_write_bytes(uart_num, src, size);
+}
 
 
 
@@ -431,9 +443,9 @@ void app_main(void) {
     if (static_ip == NULL) {
         static_ip = param_set_default("");
     }
-    get_config_param_str("subnet_mask", &subnet_mask);
-    if (subnet_mask == NULL) {
-        subnet_mask = param_set_default("");
+    get_config_param_str("ble_name", &ble_name);
+    if (ble_name == NULL) {
+        ble_name = param_set_default("ble_uart");
     }
     get_config_param_str("gateway_addr", &gateway_addr);
     if (gateway_addr == NULL) {
@@ -448,7 +460,7 @@ void app_main(void) {
         ap_passwd = param_set_default("");
     }
     // Setup WIFI
-    wifi_init(ssid, passwd, static_ip, subnet_mask, gateway_addr, ap_ssid, ap_passwd);
+    wifi_init(ssid, passwd, static_ip, ble_name, gateway_addr, ap_ssid, ap_passwd);
 
 
     char *lock = NULL;
@@ -466,7 +478,11 @@ void app_main(void) {
     init_uart();
     xTaskCreate(rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
 
-
+    send_uart_callback *ble_uart_callback;
+    ble_uart_callback=(send_uart_callback *) malloc(sizeof(send_uart_callback));
+    ble_uart_callback->func_name=ble_uart;
+    register_uart(ble_uart_callback,ble_name);
+    init_ble();
 
 
 

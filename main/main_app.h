@@ -15,7 +15,7 @@ extern "C" {
 extern char *ssid;
 extern char *passwd;
 extern char *static_ip;
-extern char *subnet_mask;
+extern char *ble_name;
 extern char *gateway_addr;
 extern char *ap_ssid;
 extern char *ap_passwd;
