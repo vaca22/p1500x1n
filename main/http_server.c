@@ -26,19 +26,7 @@
 
 static const char *TAG = "HTTPServer";
 
-esp_timer_handle_t restart_timer;
 
-static void restart_timer_callback(void *arg) {
-    ESP_LOGI(TAG, "Restarting now...");
-    esp_restart();
-}
-
-esp_timer_create_args_t restart_timer_args = {
-        .callback = &restart_timer_callback,
-        /* argument specified here will be passed to timer callback function */
-        .arg = (void *) 0,
-        .name = "restart_timer"
-};
 
 /* An HTTP GET handler */
 static esp_err_t index_get_handler(httpd_req_t *req) {
@@ -64,9 +52,7 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
         buf = malloc(buf_len);
         if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
             ESP_LOGI(TAG, "Found URL query => %s", buf);
-            if (strcmp(buf, "reset=Restart") == 0) {
-                esp_timer_start_once(restart_timer, 500000);
-            }
+
             char param1[64];
             /* Get value of expected key from query string */
             if (httpd_query_key_value(buf, "ap_ssid", param1, sizeof(param1)) == ESP_OK) {
@@ -139,10 +125,7 @@ static httpd_uri_t indexp = {
         .handler   = index_get_handler,
 };
 
-esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err) {
-    httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Page not found");
-    return ESP_FAIL;
-}
+
 
 httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
@@ -159,7 +142,6 @@ httpd_handle_t start_webserver(void) {
             static_ip, tcp_port, udp_port, bau);
     indexp.user_ctx = config_page;
 
-    esp_timer_create(&restart_timer_args, &restart_timer);
 
     // Start the httpd server
     ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
@@ -174,7 +156,3 @@ httpd_handle_t start_webserver(void) {
     return NULL;
 }
 
-static void stop_webserver(httpd_handle_t server) {
-    // Stop the httpd server
-    httpd_stop(server);
-}
