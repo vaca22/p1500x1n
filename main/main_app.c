@@ -72,7 +72,7 @@ bool ap_connect = false;
 esp_netif_t *wifiAP;
 esp_netif_t *wifiSTA;
 
-static const char *TAG = "ESP32 NAT router";
+static const char *TAG = "ESP32 uart";
 
 
 EventGroupHandle_t udp_event_group;
