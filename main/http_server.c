@@ -85,7 +85,9 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
             if (httpd_query_key_value(buf, "is_connect_router", param1, sizeof(param1)) == ESP_OK) {
                 preprocess_string(param1);
                 ESP_LOGI(TAG, "Found URL query parameter => is_connect_router=%s  %d", param1, strlen(param1));
-                set_str("is_connect_router",param1);
+                set_str("icr","1");
+            }else{
+                set_str("icr","0");
             }
             if (httpd_query_key_value(buf, "router_name", param1, sizeof(param1)) == ESP_OK) {
                 preprocess_string(param1);
