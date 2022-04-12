@@ -8,8 +8,8 @@
 
 
 #define UART_PORT_NUM UART_NUM_1
-#define TXD_PIN (GPIO_NUM_22)
-#define RXD_PIN (GPIO_NUM_21)
+#define TXD_PIN (GPIO_NUM_4)
+#define RXD_PIN (GPIO_NUM_5)
 
 
 
