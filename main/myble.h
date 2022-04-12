@@ -12,7 +12,7 @@ extern "C" {
 typedef struct {
     void (*func_name)(uart_port_t uart_num, const void *src, size_t size);
 }send_uart_callback;
-void register_uart(send_uart_callback * x,char* y);
+void register_uart(send_uart_callback * x);
 struct ble_hs_cfg;
 struct ble_gatt_register_ctxt;
 

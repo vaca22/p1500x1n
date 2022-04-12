@@ -17,10 +17,10 @@ struct os_mbuf *om;
 uint16_t hrs_hrm_handle;
 uint16_t conn_handle;
 int ble_connect_flag=0;
-char ble_name[20];
+extern char *ble_name;
 
-void register_uart(send_uart_callback * x,char* y) {
-    strcpy(ble_name,y);
+void register_uart(send_uart_callback * x) {
+
     uart_send=x;
 }
 

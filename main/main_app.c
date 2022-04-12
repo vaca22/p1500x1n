@@ -273,6 +273,7 @@ static void tcp_connect(void *pvParameters) {
 static const int RX_BUF_SIZE = 1024;
 
 int bau_num=115200;
+int bau_index=4;
 
 
 void init_uart(void) {
@@ -457,7 +458,7 @@ void wifi_init(const char *ssid, const char *passwd, const char *static_ip, cons
         strlcpy((char *) ap_config.sta.password, ap_passwd, sizeof(ap_config.sta.password));
     }
 
-    if (strlen(ssid) > 0) {
+    if ((strlen(ssid) > 0)&&(icr==1)) {
         strlcpy((char *) wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
         strlcpy((char *) wifi_config.sta.password, passwd, sizeof(wifi_config.sta.password));
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
@@ -501,6 +502,8 @@ char *ap_passwd = NULL;
 char *gw=NULL;
 char *netmask=NULL;
 char *bauchar=NULL;
+char *is_connect_router=NULL;
+int icr=0;
 int bau_list[]={9600,19200,38400,115200,2000000};
 
 char *param_set_default(const char *def_val) {
@@ -573,9 +576,25 @@ void app_main(void) {
         bauchar = param_set_default("4");
     }else{
         if(atoi(bauchar)>=1){
+            bau_index= atoi(bauchar);
             bau_num=bau_list[atoi(bauchar)-1];
         }
 
+    }
+
+    get_config_param_str("is_connect_router", &is_connect_router);
+    if (is_connect_router == NULL) {
+        icr=1;
+        ESP_LOGE(TAG, "fuck3");
+        bauchar = param_set_default("0");
+    }else{
+        if(is_connect_router[0]=='o'){
+            ESP_LOGE(TAG, "fuck");
+            icr=1;
+        }else{
+            ESP_LOGE(TAG, "fuck2");
+            icr=0;
+        }
     }
     // Setup WIFI
     wifi_init(ssid, passwd, static_ip, netmask, gw, ap_ssid, ap_passwd);
@@ -599,7 +618,7 @@ void app_main(void) {
     send_uart_callback *ble_uart_callback;
     ble_uart_callback=(send_uart_callback *) malloc(sizeof(send_uart_callback));
     ble_uart_callback->func_name=ble_uart;
-    register_uart(ble_uart_callback,ble_name);
+    register_uart(ble_uart_callback);
     init_ble();
 
 

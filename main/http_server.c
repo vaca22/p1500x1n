@@ -13,10 +13,8 @@
 #include <esp_system.h>
 #include <esp_timer.h>
 #include <sys/param.h>
-//#include "nvs_flash.h"
+
 #include "esp_netif.h"
-//#include "esp_eth.h"
-//#include "protocol_examples_common.h"
 
 #include <esp_http_server.h>
 
@@ -25,6 +23,8 @@
 
 static const char *TAG = "HTTPServer";
 
+extern const unsigned char upload_script_start[] asm("_binary_index_html_start");
+extern const unsigned char upload_script_end[]   asm("_binary_index_html_end");
 
 esp_timer_handle_t restart_timer;
 
@@ -121,7 +121,7 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
 
             }
 
-            esp_timer_start_once(restart_timer, 500000);
+          //  esp_timer_start_once(restart_timer, 500000);
 
         }
         free(buf);
@@ -135,12 +135,50 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+
+
+
+
+
+
+
+static esp_err_t status_handler(httpd_req_t *req){
+    static char json_response[1024];
+    char * p = json_response;
+    char fuck[]="gaga";
+    *p++ = '{';
+    p+=sprintf(p, "\"wifi_name\":\"%s\",", ap_ssid);
+    p+=sprintf(p, "\"wifi_password\":\"%s\",", ap_passwd);
+    p+=sprintf(p, "\"ble_name\":\"%s\",", ble_name);
+    p+=sprintf(p, "\"router_name\":\"%s\",", ssid);
+    p+=sprintf(p, "\"router_password\":\"%s\",",passwd );
+    p+=sprintf(p, "\"is_connect_router\":\"%d\",", icr);
+    p+=sprintf(p, "\"inner_ip\":\"%s\",", static_ip);
+    p+=sprintf(p, "\"tcp_port\":%d,", TCP_PORT);
+    p+=sprintf(p, "\"udp_port\":%d,", UDP_PORT);
+    p+=sprintf(p, "\"bau\":%d", bau_index);
+    *p++ = '}';
+    *p++ = 0;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, json_response, strlen(json_response));
+}
+
+
+
+
+
 static httpd_uri_t indexp = {
         .uri       = "/",
         .method    = HTTP_GET,
         .handler   = index_get_handler,
 };
-
+httpd_uri_t status_uri = {
+        .uri       = "/status",
+        .method    = HTTP_GET,
+        .handler   = status_handler,
+        .user_ctx  = NULL
+};
 
 
 httpd_handle_t start_webserver(void) {
@@ -153,10 +191,11 @@ httpd_handle_t start_webserver(void) {
 
     sprintf(bau,"%d",bau_num);
 
-    const char *config_page_template = CONFIG_PAGE;
-    char *config_page = malloc(strlen(config_page_template) + 512);
-    sprintf(config_page, config_page_template, ap_ssid, ap_passwd, ble_name, checked, ssid, passwd,
-            static_ip, tcp_port, udp_port, bau);
+    const char *config_page_template = (char*)upload_script_start;
+    int total=upload_script_end-upload_script_start;
+    char *config_page = malloc(total+ 1);
+    memcpy(config_page,upload_script_start,total);
+    config_page[total]=0;
     indexp.user_ctx = config_page;
     esp_timer_create(&restart_timer_args, &restart_timer);
 
@@ -166,6 +205,7 @@ httpd_handle_t start_webserver(void) {
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &indexp);
+        httpd_register_uri_handler(server,&status_uri);
         return server;
     }
 

@@ -11,18 +11,19 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+extern char *ble_name;
 extern char *ssid;
 extern char *passwd;
 extern char *static_ip;
-extern char *ble_name;
 extern char *tcpport;
 extern char *ap_ssid;
 extern char *ap_passwd;
 extern int TCP_PORT;
 extern int UDP_PORT;
 extern int bau_num;
-extern char *ble_name;
+extern int bau_index;
+extern char *is_connect_router;
+extern int icr;
 void preprocess_string(char *str);
 
 int set_sta(int argc, char **argv);
