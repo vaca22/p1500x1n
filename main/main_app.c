@@ -585,14 +585,11 @@ void app_main(void) {
     get_config_param_str("icr", &is_connect_router);
     if (is_connect_router == NULL) {
         icr=1;
-        ESP_LOGE(TAG, "fuck3");
         bauchar = param_set_default("1");
     }else{
         if(is_connect_router[0]=='1'){
-            ESP_LOGE(TAG, "fuck");
             icr=1;
         }else{
-            ESP_LOGE(TAG, "fuck2");
             icr=0;
         }
     }

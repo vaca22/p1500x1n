@@ -17,6 +17,7 @@
 #include "esp_netif.h"
 
 #include <esp_http_server.h>
+#include <esp_ota_ops.h>
 
 #include "main_app.h"
 #include "router_globals.h"
@@ -123,7 +124,7 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
 
             }
 
-          //  esp_timer_start_once(restart_timer, 500000);
+            esp_timer_start_once(restart_timer, 500000);
 
         }
         free(buf);
@@ -147,7 +148,6 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
 static esp_err_t status_handler(httpd_req_t *req){
     static char json_response[1024];
     char * p = json_response;
-    char fuck[]="gaga";
     *p++ = '{';
     p+=sprintf(p, "\"wifi_name\":\"%s\",", ap_ssid);
     p+=sprintf(p, "\"wifi_password\":\"%s\",", ap_passwd);
@@ -167,7 +167,37 @@ static esp_err_t status_handler(httpd_req_t *req){
 }
 
 
+static esp_err_t upload_post_handler(httpd_req_t *req)
+{
+    esp_ota_handle_t update_handle = 0 ;
+    const esp_partition_t *update_partition = NULL;
+    update_partition = esp_ota_get_next_update_partition(NULL);
+    esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle);
+    int update_mtu=200;
+    char buf[update_mtu] ;
+    int received;
 
+    int remaining = req->content_len;
+
+    int tt=0;
+    while (remaining > 0) {
+        ESP_LOGI(TAG, "Remaining size : %d", remaining);
+        if ((received = httpd_req_recv(req, buf, MIN(remaining, update_mtu))) <= 0) {
+            continue;
+        }
+        tt+=received;
+        esp_ota_write( update_handle, (const void *)buf, received);
+        remaining -= received;
+    }
+    ESP_LOGE(TAG, "Total size : %d",tt);
+
+    ESP_LOGI(TAG, "File reception complete");
+    esp_ota_end(update_handle);
+    esp_ota_set_boot_partition(update_partition);
+    httpd_resp_sendstr(req, "File uploaded successfully");
+    esp_timer_start_once(restart_timer, 500000);
+    return ESP_OK;
+}
 
 
 static httpd_uri_t indexp = {
@@ -181,7 +211,11 @@ httpd_uri_t status_uri = {
         .handler   = status_handler,
         .user_ctx  = NULL
 };
-
+httpd_uri_t file_upload = {
+        .uri       = "/update",
+        .method    = HTTP_POST,
+        .handler   = upload_post_handler,
+};
 
 httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
@@ -208,6 +242,7 @@ httpd_handle_t start_webserver(void) {
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &indexp);
         httpd_register_uri_handler(server,&status_uri);
+        httpd_register_uri_handler(server,&file_upload);
         return server;
     }
 
