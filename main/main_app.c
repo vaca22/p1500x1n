@@ -270,7 +270,7 @@ static void tcp_connect(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-static const int RX_BUF_SIZE = 1024;
+static const int RX_BUF_SIZE = 1;
 
 int bau_num=115200;
 int bau_index=4;
