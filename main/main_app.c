@@ -389,6 +389,11 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event) {
             break;
         case SYSTEM_EVENT_AP_STACONNECTED:
             connect_count++;
+            if(got_ip==0){
+                got_ip=1;
+                xTaskCreate(&udp_connect, "udp_connect", 4096, NULL, 5, NULL);
+                xTaskCreate(&tcp_connect, "tcp_connect", 4096, NULL, 5, NULL);
+            }
             ESP_LOGI(TAG, "%d. station connected", connect_count);
             break;
         case SYSTEM_EVENT_AP_STADISCONNECTED:
@@ -618,7 +623,7 @@ void app_main(void) {
     register_uart(ble_uart_callback);
     init_ble();
 
-
+    ESP_LOGE(TAG, "Good Good Good");
 
 
 
