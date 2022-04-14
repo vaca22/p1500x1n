@@ -270,7 +270,7 @@ static void tcp_connect(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-static const int RX_BUF_SIZE = 1;
+static const int RX_BUF_SIZE = 1024;
 
 int bau_num=115200;
 int bau_index=4;
@@ -284,6 +284,7 @@ void init_uart(void) {
             .stop_bits = UART_STOP_BITS_1,
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
             .source_clk = UART_SCLK_APB,
+
     };
     // We won't use a buffer for sending data.
     uart_driver_install(UART_PORT_NUM, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
@@ -308,7 +309,7 @@ static void uart_rx_task(void *arg)
     esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
     uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE+1);
     while (1) {
-        const int rxBytes = uart_read_bytes(UART_PORT_NUM, data, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
+        const int rxBytes = uart_read_bytes(UART_PORT_NUM, data, RX_BUF_SIZE, 22/ portTICK_RATE_MS);
         if (rxBytes > 0) {
             data[rxBytes] = 0;
             if(ble_connect_flag){
