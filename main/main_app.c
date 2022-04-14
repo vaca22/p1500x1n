@@ -565,7 +565,7 @@ void app_main(void) {
     if (ap_ssid == NULL) {
         ap_ssid = param_set_default("ESP32_UART");
     }
-    get_config_param_str("ap_passwd", &ap_passwd);
+    get_config_param_str("ap_password", &ap_passwd);
     if (ap_passwd == NULL) {
         ap_passwd = param_set_default("");
     }
