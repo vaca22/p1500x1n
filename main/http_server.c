@@ -183,7 +183,7 @@ static esp_err_t status_handler(httpd_req_t *req){
 }
 
 
-const int total=50000;
+const int total=10000;
 char *play_ring_buffer;
 const int safeArea=total/2;
 static int downloadIndex=0;
