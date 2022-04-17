@@ -183,7 +183,7 @@ static esp_err_t status_handler(httpd_req_t *req){
 }
 
 
-const int total=1000000;
+const int total=50000;
 char *play_ring_buffer;
 const int safeArea=total/2;
 static int downloadIndex=0;
@@ -207,15 +207,15 @@ int isSafe(){
     }
 
 }
-int isSafe2(){
+int isSafe2(int x){
     if(downloadIndex>=playIndex){
-        if(downloadIndex-playIndex<safeArea/3){
+        if(downloadIndex-playIndex<x){
             return 0;
         }else{
             return 1;
         }
     }else{
-        if(downloadIndex+total-playIndex<safeArea/3){
+        if(downloadIndex+total-playIndex<x){
             return 0;
         }else{
             return 1;
@@ -230,6 +230,9 @@ int isSafe2(){
 static TaskHandle_t chem1_task_h;
 int mp3_music_read_cb(audio_element_handle_t el, char *buf, int len, TickType_t wait_time, void *ctx)
 {
+    while (isSafe2(len)==0){
+        vTaskDelay(1);
+    }
 
     for(int k=0;k<len;k++){
         if(playIndex>=total){
