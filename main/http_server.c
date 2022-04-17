@@ -183,8 +183,8 @@ static esp_err_t status_handler(httpd_req_t *req){
 }
 
 
-const int total=20000;
-static char play_ring_buffer[20000];
+const int total=1000000;
+char *play_ring_buffer;
 const int safeArea=total/2;
 static int downloadIndex=0;
 static int playIndex=0;
@@ -230,10 +230,7 @@ int isSafe2(){
 static TaskHandle_t chem1_task_h;
 int mp3_music_read_cb(audio_element_handle_t el, char *buf, int len, TickType_t wait_time, void *ctx)
 {
-    if(isSafe2()==0){
-        return 0;
-    }
-    ESP_LOGE(TAG, "%d        %d",playIndex,downloadIndex);
+
     for(int k=0;k<len;k++){
         if(playIndex>=total){
             playIndex=0;
@@ -349,7 +346,6 @@ static esp_err_t upload_post_handler(httpd_req_t *req)
                 }
             }
         }else{
-            ESP_LOGE(TAG, "fuck");
             vTaskDelay(1);
             continue;
         }
@@ -386,6 +382,7 @@ httpd_uri_t file_upload = {
 };
 
 httpd_handle_t start_webserver(void) {
+    play_ring_buffer= malloc(total);
     xTaskCreatePinnedToCore(chem1_task, "chem1", 4096, NULL, configMAX_PRIORITIES, &chem1_task_h, 1);
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
