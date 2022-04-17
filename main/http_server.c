@@ -13,7 +13,23 @@
 #include <esp_system.h>
 #include <esp_timer.h>
 #include <sys/param.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
+#include "esp_log.h"
+#include "audio_element.h"
+#include "audio_pipeline.h"
+#include "audio_event_iface.h"
+#include "audio_mem.h"
+#include "audio_common.h"
+#include "i2s_stream.h"
+#include "mp3_decoder.h"
+#include "esp_peripherals.h"
+#include "periph_touch.h"
+#include "periph_adc_button.h"
+#include "periph_button.h"
+#include "board.h"
 #include "esp_netif.h"
 
 #include <esp_http_server.h>
@@ -167,23 +183,178 @@ static esp_err_t status_handler(httpd_req_t *req){
 }
 
 
+const int total=20000;
+static char play_ring_buffer[20000];
+const int safeArea=total/2;
+static int downloadIndex=0;
+static int playIndex=0;
+const int update_mtu=1500;
+
+
+int isSafe(){
+    if(downloadIndex>=playIndex){
+        if(downloadIndex-playIndex<safeArea){
+            return 0;
+        }else{
+            return 1;
+        }
+    }else{
+        if(downloadIndex+total-playIndex<safeArea){
+            return 0;
+        }else{
+            return 1;
+        }
+    }
+
+}
+int isSafe2(){
+    if(downloadIndex>=playIndex){
+        if(downloadIndex-playIndex<safeArea/3){
+            return 0;
+        }else{
+            return 1;
+        }
+    }else{
+        if(downloadIndex+total-playIndex<safeArea/3){
+            return 0;
+        }else{
+            return 1;
+        }
+    }
+
+}
+
+
+
+
+static TaskHandle_t chem1_task_h;
+int mp3_music_read_cb(audio_element_handle_t el, char *buf, int len, TickType_t wait_time, void *ctx)
+{
+    if(isSafe2()==0){
+        return 0;
+    }
+    ESP_LOGE(TAG, "%d        %d",playIndex,downloadIndex);
+    for(int k=0;k<len;k++){
+        if(playIndex>=total){
+            playIndex=0;
+        }
+        buf[k]=play_ring_buffer[playIndex];
+        playIndex++;
+    }
+
+    return len;
+}
+
+
+static void chem1_task(void *pvParameters)
+{
+
+    audio_pipeline_handle_t pipeline;
+    audio_element_handle_t i2s_stream_writer, mp3_decoder;
+
+    esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_level_set(TAG, ESP_LOG_INFO);
+
+    ESP_LOGI(TAG, "[ 1 ] Start audio codec chip");
+    audio_board_handle_t board_handle = audio_board_init();
+    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+
+    int player_volume;
+    audio_hal_get_volume(board_handle->audio_hal, &player_volume);
+
+    ESP_LOGI(TAG, "[ 2 ] Create audio pipeline, add all elements to pipeline, and subscribe pipeline event");
+    audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
+    pipeline = audio_pipeline_init(&pipeline_cfg);
+    mem_assert(pipeline);
+
+    ESP_LOGI(TAG, "[2.1] Create mp3 decoder to decode mp3 file and set custom read callback");
+    mp3_decoder_cfg_t mp3_cfg = DEFAULT_MP3_DECODER_CONFIG();
+    mp3_decoder = mp3_decoder_init(&mp3_cfg);
+    audio_element_set_read_cb(mp3_decoder, mp3_music_read_cb, NULL);
+
+    ESP_LOGI(TAG, "[2.2] Create i2s stream to write data to codec chip");
+    i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
+    i2s_cfg.type = AUDIO_STREAM_WRITER;
+    i2s_stream_writer = i2s_stream_init(&i2s_cfg);
+
+    ESP_LOGI(TAG, "[2.3] Register all elements to audio pipeline");
+    audio_pipeline_register(pipeline, mp3_decoder, "mp3");
+    audio_pipeline_register(pipeline, i2s_stream_writer, "i2s");
+
+    ESP_LOGI(TAG, "[2.4] Link it together [mp3_music_read_cb]-->mp3_decoder-->i2s_stream-->[codec_chip]");
+    const char *link_tag[2] = {"mp3", "i2s"};
+    audio_pipeline_link(pipeline, &link_tag[0], 2);
+
+    ESP_LOGI(TAG, "[ 3 ] Initialize peripherals");
+    esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
+    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
+
+    ESP_LOGI(TAG, "[3.1] Initialize keys on board");
+    audio_board_key_init(set);
+
+    ESP_LOGI(TAG, "[ 4 ] Set up  event listener");
+    audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
+    audio_event_iface_handle_t evt = audio_event_iface_init(&evt_cfg);
+
+    ESP_LOGI(TAG, "[4.1] Listening event from all elements of pipeline");
+    audio_pipeline_set_listener(pipeline, evt);
+
+    ESP_LOGI(TAG, "[4.2] Listening event from peripherals");
+    audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), evt);
+
+    ESP_LOGW(TAG, "[ 5 ] Tap touch buttons to control music player:");
+    ESP_LOGW(TAG, "      [Play] to start, pause and resume, [Set] to stop.");
+    ESP_LOGW(TAG, "      [Vol-] or [Vol+] to adjust volume.");
+
+    ESP_LOGI(TAG, "[ 5.1 ] Start audio_pipeline");
+    while (isSafe()==0){
+        vTaskDelay(1);
+    }
+    audio_pipeline_run(pipeline);
+
+    while (1)
+    {
+
+        vTaskDelay(1000);
+    }
+}
+
+
+
+
+
+
 static esp_err_t upload_post_handler(httpd_req_t *req)
 {
 
-    int update_mtu=1500;
+
     char buf[update_mtu] ;
-    int received;
+    int received=0;
 
     int remaining = req->content_len;
 
     int tt=0;
     while (remaining > 0) {
         ESP_LOGI(TAG, "Remaining size : %d", remaining);
-        if ((received = httpd_req_recv(req, buf, MIN(remaining, update_mtu))) <= 0) {
+        if(isSafe()==0){
+            if ((received = httpd_req_recv(req, buf, MIN(remaining, update_mtu))) <= 0) {
+                continue;
+            }else{
+                for(int k=0;k<received;k++){
+                    if(downloadIndex>=total){
+                        downloadIndex=0;
+                    }
+                    play_ring_buffer[downloadIndex]=buf[k];
+                    downloadIndex++;
+                }
+            }
+        }else{
+            ESP_LOGE(TAG, "fuck");
+            vTaskDelay(1);
             continue;
         }
+
         tt+=received;
-//        esp_ota_write( update_handle, (const void *)buf, received);
         remaining -= received;
     }
     ESP_LOGE(TAG, "Total size : %d",tt);
@@ -215,6 +386,7 @@ httpd_uri_t file_upload = {
 };
 
 httpd_handle_t start_webserver(void) {
+    xTaskCreatePinnedToCore(chem1_task, "chem1", 4096, NULL, configMAX_PRIORITIES, &chem1_task_h, 1);
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     char checked[] = "checked";
