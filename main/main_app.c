@@ -46,7 +46,6 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "main_app.h"
-#include "myble.h"
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t wifi_event_group;
 
@@ -299,10 +298,7 @@ void init_uart(void) {
 
 
 
-extern struct os_mbuf *om;
-extern uint16_t hrs_hrm_handle;
-extern uint16_t conn_handle;
-extern int ble_connect_flag;
+
 static void uart_rx_task(void *arg)
 {
     static const char *RX_TASK_TAG = "RX_TASK";
@@ -312,10 +308,7 @@ static void uart_rx_task(void *arg)
         const int rxBytes = uart_read_bytes(UART_PORT_NUM, data, RX_BUF_SIZE, 22/ portTICK_RATE_MS);
         if (rxBytes > 0) {
             data[rxBytes] = 0;
-            if(ble_connect_flag){
-                om = ble_hs_mbuf_from_flat(data, rxBytes);
-                ble_gattc_notify_custom(conn_handle, hrs_hrm_handle, om);
-            }
+
 
             if(receive_udp){
                 sendto(udp_connect_socket, data, rxBytes, 0, (struct sockaddr *) &udp_client_addr, sizeof(udp_client_addr));
@@ -522,9 +515,6 @@ char *param_set_default(const char *def_val) {
 
 
 
-void ble_uart(uart_port_t uart_num, const void *src, size_t size){
-    uart_write_bytes(uart_num, src, size);
-}
 
 
 
@@ -617,12 +607,7 @@ void app_main(void) {
 
     init_uart();
     xTaskCreate(uart_rx_task, "uart_rx_task", 1024 * 2, NULL, configMAX_PRIORITIES, NULL);
-
-    send_uart_callback *ble_uart_callback;
-    ble_uart_callback=(send_uart_callback *) malloc(sizeof(send_uart_callback));
-    ble_uart_callback->func_name=ble_uart;
-    register_uart(ble_uart_callback);
-    init_ble();
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     ESP_LOGE(TAG, "Good Good Good");
 
