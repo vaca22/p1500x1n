@@ -169,11 +169,8 @@ static esp_err_t status_handler(httpd_req_t *req){
 
 static esp_err_t upload_post_handler(httpd_req_t *req)
 {
-    esp_ota_handle_t update_handle = 0 ;
-    const esp_partition_t *update_partition = NULL;
-    update_partition = esp_ota_get_next_update_partition(NULL);
-    esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle);
-    int update_mtu=200;
+
+    int update_mtu=1500;
     char buf[update_mtu] ;
     int received;
 
@@ -186,16 +183,16 @@ static esp_err_t upload_post_handler(httpd_req_t *req)
             continue;
         }
         tt+=received;
-        esp_ota_write( update_handle, (const void *)buf, received);
+//        esp_ota_write( update_handle, (const void *)buf, received);
         remaining -= received;
     }
     ESP_LOGE(TAG, "Total size : %d",tt);
 
     ESP_LOGI(TAG, "File reception complete");
-    esp_ota_end(update_handle);
-    esp_ota_set_boot_partition(update_partition);
+//    esp_ota_end(update_handle);
+//    esp_ota_set_boot_partition(update_partition);
     httpd_resp_sendstr(req, "File uploaded successfully");
-    esp_timer_start_once(restart_timer, 500000);
+//    esp_timer_start_once(restart_timer, 500000);
     return ESP_OK;
 }
 
