@@ -47,6 +47,8 @@
 #include "driver/gpio.h"
 #include "main_app.h"
 #include "myble.h"
+#include "dns_server.h"
+
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t wifi_event_group;
 
@@ -54,7 +56,7 @@ static EventGroupHandle_t wifi_event_group;
  * - are we connected to the AP with an IP? */
 const int WIFI_CONNECTED_BIT = BIT0;
 
-#define MY_DNS_IP_ADDR 0x08080808
+#define MY_DNS_IP_ADDR 0x00000000
 
 static int server_socket = 0;                        // 服务器socket
 static struct sockaddr_in server_addr;                // server地址
@@ -375,7 +377,7 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event) {
 
             if (esp_netif_get_dns_info(wifiSTA, ESP_NETIF_DNS_MAIN, &dns) == ESP_OK) {
                 ip_addr_t dnsserver;
-                dnsserver.u_addr.ip4.addr = htonl(MY_DNS_IP_ADDR);
+               // dnsserver.u_addr.ip4.addr = htonl(MY_DNS_IP_ADDR);
                 dnsserver.type = IPADDR_TYPE_V4;
                 dhcps_dns_setserver(&dnsserver);
                 ESP_LOGI(TAG, "set dns to:" IPSTR, IP2STR(&dns.ip.u_addr.ip4));
@@ -476,13 +478,13 @@ void wifi_init(const char *ssid, const char *passwd, const char *static_ip, cons
     }
 
     // Enable DNS (offer) for dhcp server
-    dhcps_offer_t dhcps_dns_value = OFFER_DNS;
-    dhcps_set_option_info(6, &dhcps_dns_value, sizeof(dhcps_dns_value));
-
-    // Set custom dns server address for dhcp server
-    dnsserver.u_addr.ip4.addr = htonl(MY_DNS_IP_ADDR);
-    dnsserver.type = IPADDR_TYPE_V4;
-    dhcps_dns_setserver(&dnsserver);
+//    dhcps_offer_t dhcps_dns_value = OFFER_DNS;
+//    dhcps_set_option_info(6, &dhcps_dns_value, sizeof(dhcps_dns_value));
+//
+//    // Set custom dns server address for dhcp server
+//    dnsserver.u_addr.ip4.addr = htonl(MY_DNS_IP_ADDR);
+//    dnsserver.type = IPADDR_TYPE_V4;
+//    dhcps_dns_setserver(&dnsserver);
 
 
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
@@ -627,7 +629,7 @@ void app_main(void) {
     ESP_LOGE(TAG, "Good Good Good");
 
 
-
+    start_dns_server();
 
 
 }

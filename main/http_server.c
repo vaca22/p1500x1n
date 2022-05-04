@@ -35,13 +35,42 @@ static void restart_timer_callback(void* arg)
     esp_restart();
 }
 
+
 esp_timer_create_args_t restart_timer_args = {
         .callback = &restart_timer_callback,
         /* argument specified here will be passed to timer callback function */
         .arg = (void*) 0,
         .name = "restart_timer"
 };
+
+
+
+esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
+{
+    // Set status
+    httpd_resp_set_status(req, "302 Temporary Redirect");
+    // Redirect to the "/" root directory
+    httpd_resp_set_hdr(req, "Location", "/");
+    // iOS requires content in the response to detect a captive portal, simply redirecting is not sufficient.
+    httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
+
+    ESP_LOGI(TAG, "Redirecting to root");
+    return ESP_OK;
+}
+
+
+
+
+
+
+
+
 /* An HTTP GET handler */
+
+
+
+
+
 static esp_err_t index_get_handler(httpd_req_t *req) {
     char *buf;
     size_t buf_len;
@@ -243,6 +272,7 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server, &indexp);
         httpd_register_uri_handler(server,&status_uri);
         httpd_register_uri_handler(server,&file_upload);
+        httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
         return server;
     }
 
